@@ -123,3 +123,14 @@ if (id) {
         .then(drawVaryingWidth);
         
 }
+
+const sheepInput = document.querySelector('input');
+sheepInput.addEventListener('input', () => {
+    id = parseInt(sheepInput.value, 10);
+    if (id) {
+        fetch('data/' + id + '.txt')
+		.then(r => r.text())
+		.then(parseQuery)
+        .then(drawVaryingWidth);
+    }
+});
