@@ -11,10 +11,88 @@
             <h1>Sheep Drawer</h1>
         </header>
 
-        <p>Input sheep ID (1~10000)</p>
-        <input type="text" id="sheep_id" name="sheep_id" required>
+        <p>Input sheep ID (1~10000) <input type="text" id="sheep_id" name="sheep_id" required> </p>
+        
+        <p>Current id: <span id="current_sheep_id"></span></p>
 
+        <div id="canvas-container">
+            <table id="canvas-grid">
+                <tr>
+                    <td><canvas id="canvas0" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas1" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas2" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas3" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas4" width="480" height="260"></canvas></td>
+                </tr>
+                <tr>
+                    <td><canvas id="canvas5" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas6" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas7" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas8" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas9" width="480" height="260"></canvas></td>
+                </tr>
+                <tr>
+                    <td><canvas id="canvas10" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas11" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas12" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas13" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas14" width="480" height="260"></canvas></td>
+                </tr>
+                <tr>
+                    <td><canvas id="canvas15" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas16" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas17" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas18" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas19" width="480" height="260"></canvas></td>
+                </tr>
+                <tr>
+                    <td><canvas id="canvas20" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas21" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas22" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas23" width="480" height="260"></canvas></td>
+                    <td><canvas id="canvas24" width="480" height="260"></canvas></td>
+                </tr>
+            </table>
+        </div>
         <canvas id="canvas" width="480" height="260"></canvas>
+
+        <div class="slidecontainer">
+            <input type="range" step="0.01" min="-5.0" max="5.0" value="0.0" class="slider" id="latent_x">
+            <p>Latent z1: <span id="latent_x_val"></span></p>
+            <p></p>
+
+            <input type="range" step="0.01" min="-5.0" max="5.0" value="0.0" class="slider" id="latent_y">
+            <p>Latent z2: <span id="latent_y_val"></span></p>
+            <p></p>
+
+            <input type="range" min="0" max="50" value="0" class="slider" id="smooth_window">
+            <p>Smooth window: <span id="smooth_window_val"></span></p>
+            <p></p>
+
+            <input type="range" min="0" max="20" value="0" class="slider" id="smooth_iterations">
+            <p>Smooth iterations: <span id="smooth_iterations_val"></span></p>
+            <p></p>
+
+            <input type="range" step="0.01" min="0.0" max="3.0" value="0.1" class="slider" id="delta_scale_x">
+            <p>Delta scale x: <span id="delta_scale_x_val"></span></p>
+            <p></p>
+            
+            <input type="range" step="0.01" min="0.0" max="3.0" value="0.1" class="slider" id="delta_scale_y">
+            <p>Delta scale y: <span id="delta_scale_y_val"></span></p>
+            <p></p>
+
+            <input type="range" step="0.01" min="0.0" max="3.0" value="0.1" class="slider" id="delta_scale_2_x">
+            <p>Delta scale 2 x: <span id="delta_scale_2_x_val"></span></p>
+            <p></p>
+            
+            <input type="range" step="0.01" min="0.0" max="3.0" value="0.1" class="slider" id="delta_scale_2_y">
+            <p>Delta scale 2 y: <span id="delta_scale_2_y_val"></span></p>
+            <p></p>
+            
+            <input type="range" step="0.1" min="0.0" max="5.0" value="1.0" class="slider" id="segment_delta">
+            <p>Segment Delta: <span id="segment_delta_val"></span></p>
+            <p></p>
+        </div>
     </div>
     <script src="./assets/js/bundle.js"></script>
 </body>

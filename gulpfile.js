@@ -6,9 +6,8 @@ var source = require('vinyl-source-stream'); // required to dest() for browserif
 var browserSync = require('browser-sync').create();
 var notifier = require('node-notifier');
 
-
 function sync() {
-    browserSync.init({
+	browserSync.init({
         server: {
             baseDir: "./"
         }
@@ -43,8 +42,8 @@ function html() {
 
 function watchJs() {
 
-	watch(['./assets/js/*.js', '!./assets/js/bundle.js'], function() {
-		gulp.start('javascript');
+	watch(['./js/*.js'], function() {
+		gulp.start('js');
 	});
 }
 
@@ -55,10 +54,9 @@ function watchHtml() {
 
 }
 
-exports.sync = sync;
 exports.js = js;
 exports.html = html;
 exports.watchJs = watchJs;
 exports.watchHtml = watchHtml;
 
-exports.default = gulp.series(js, sync, gulp.parallel(watchJs, watchHtml));
+exports.default = gulp.series(js, html, gulp.parallel(sync, watchJs, watchHtml));
