@@ -12,7 +12,7 @@ function isWindows() {
   
   var SKELETONIZATION_USE_GPU = !isWindows();
   if (!SKELETONIZATION_USE_GPU){
-    alert("Some GPU features not supported for your platform, certain actions might be slow... (But we're working on it!)")
+    //alert("Some GPU features not supported for your platform, certain actions might be slow... (But we're working on it!)")
   }
   
   var skeletonization = {}
@@ -36,9 +36,9 @@ function isWindows() {
       var p6 = a[this.thread.x+WIDTH];
       var p8 = a[this.thread.x-1];
   
-      var m1 = (p2 * p4 * p6) 
+      var m1 = (p2 * p4 * p6);
       if (m1 == 0){
-        var m2 = (p4 * p6 * p8)
+        var m2 = (p4 * p6 * p8);
         if (m2 == 0){
           var p3 = a[this.thread.x-WIDTH+1];
           var p5 = a[this.thread.x+WIDTH+1];
@@ -84,9 +84,9 @@ function isWindows() {
       var p6 = a[this.thread.x+WIDTH];
       var p8 = a[this.thread.x-1];
   
-      var m1 = (p2 * p4 * p8) 
+      var m1 = (p2 * p4 * p8); 
       if (m1 == 0){
-        var m2 = (p2 * p6 * p8)
+        var m2 = (p2 * p6 * p8);
         if (m2 == 0){
           var p3 = a[this.thread.x-WIDTH+1];
           var p5 = a[this.thread.x+WIDTH+1];
@@ -202,7 +202,7 @@ function isWindows() {
       var prev = cv.Mat.zeros(im.rows,im.cols, cv.CV_8UC1);
       var diff = new cv.Mat();
   
-      var thinIter = SKELETONIZATION_USE_GPU ? skeletonization.thinningIteration : skeletonization.thinningIterationSeq
+      var thinIter = SKELETONIZATION_USE_GPU ? skeletonization.thinningIteration : skeletonization.thinningIterationSeq;
   
       do {
         thinIter(im, 0, args.bbox);

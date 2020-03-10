@@ -342,7 +342,7 @@ var doodleMeta = new function(){
     
     that.deepCopyNodes = function(nodes){
   
-      var nnodes = []
+      var nnodes = [];
       for (var i = 0; i < nodes.length; i++){
         var n = nodes[i]
         nnodes.push({
@@ -350,7 +350,8 @@ var doodleMeta = new function(){
           th0:n.th0,
           thabs:n.thabs,
           r : n.r,
-          id: n.id,
+          //id: n.id,
+          id : that.randomId(),
           type: n.type,
           x: n.x,
           y: n.y,
@@ -416,7 +417,7 @@ var doodleMeta = new function(){
     }
   
   
-    that.buildSkin = function(strokes,nodes){
+    that.buildSkin = function(strokes, nodes){
       if (strokes == undefined || nodes == undefined || !strokes.length || !nodes.length){
         return [];
       }
@@ -697,6 +698,8 @@ var FileSaver = require('file-saver');
 
 var io = require('socket.io-client');
 
+const {parse, stringify} = require('flatted/cjs');
+
 // var $ = require("jquery");
 
 // const numRow = 5;
@@ -836,8 +839,8 @@ let drawSequence = [];
 
 var FAT = 15;
 var BLEED = 5;
-let NODES = [];
-let SKIN = []
+//let NODES = [];
+//let SKIN = []
 
 let lastPos = null;
 
@@ -880,6 +883,47 @@ var parseSheep = (sheep) => {
 	
 }
 
+var saveRig = (strokes) => {
+  doodleRig.checkOpenCVReady(() => {console.log('cv ready'); });
+  var canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d');
+  ctx.lineWidth = 1;
+  ctx.fillStyle="white";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle="black";
+  draw_strokes(ctx, strokes);
+
+  doodleRig.setup({
+    width:canvas.width,
+    height:canvas.height,
+    fat:FAT,
+    bleed:BLEED,
+    canvasId:'canvas'
+    });
+
+  var ret = doodleRig.process(strokes);
+
+  var allNodes = {};
+
+  let skin = ret.skin;
+  for (let j = 0; j < skin.length; j++) {
+    skin[j].x0 = parseFloat(j) / skin.length * canvas.width;
+    skin[j].y0 = canvas.height * 0.5;
+  }
+
+  ret.nodes.forEach((item) => {
+    allNodes[item.id] = stringify(item);
+  })
+
+  //var blob = new Blob(, {type: "text/plain;charset=utf-8"});
+  var s = stringify([allNodes, ret.nodes, ret.skin]);
+  FileSaver.saveAs(new Blob([s]), id + "_rig.json");
+
+  id = id + 1;
+
+  beginDraw(id);
+}
+
 
 const n = 10;
 
@@ -905,7 +949,7 @@ var testAnimation = (strokes) => {
       fat:FAT,
       bleed:BLEED,
       canvasId:'canvas'+i
-      })
+      });
 
     // generate skeleton
     var ret = doodleRig.process(strokes);
@@ -931,7 +975,6 @@ var testAnimation = (strokes) => {
 	setInterval(() => {
     try {
 
-      console.log(lerpMousePos);
       for (let i = 0; i < n; ++i) {
         var canvas = document.getElementById('canvas' + i);
         var ctx = canvas.getContext('2d');
@@ -948,7 +991,103 @@ var testAnimation = (strokes) => {
         for (var j = 0; j < nodes.length; j++){
           if (nodes[j].parent ){
             var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
-            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.003/r+r*Math.PI*2)*r*0.8*Math.sin(i+1);
+            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
+          }
+          else
+          {
+            nodes[j].th = nodes[j].th0;
+          }
+        }
+        doodleMeta.forwardKinematicsNodes(nodes);
+        doodleMeta.calculateSkin(skin);
+          
+        ctx.strokeStyle="black";  
+        ctx.fillStyle = "none";
+        ctx.lineWidth = 1.0 + Math.random()*2;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        
+        let t = time * 0.008;
+        for (var j = 0; j < skin.length; j++){
+          let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
+          let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
+
+          // let target_x = lerp(x0, skin[j].x, Math.abs(mousePos.x - window.innerWidth*0.5) / (window.innerWidth*0.5));
+          // let target_y = lerp(y0, skin[j].y, Math.abs(mousePos.y - window.innerHeight*0.5) / (window.innerHeight*0.5));
+          lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
+          lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
+          let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
+          let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
+          // let target_x = skin[j].x;
+          // let target_y = skin[j].y;
+          if (!skin[j].connect){
+            if (j != 0){
+            ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.moveTo(target_x, target_y);
+          }else{
+            ctx.lineTo(target_x, target_y);
+          }
+        }
+        ctx.stroke();
+      }
+    }catch(e) {
+      console.log(e);
+    }
+    
+	}, 30);
+}
+
+
+var testAnimationRig = async (strokes) => {
+  let response = await fetch('data/rig/' + id + '_rig.json');
+  let data = await response.text();
+  //console.log(data);
+  let rig = parse(data);
+  //console.log(rig);
+
+  let NODES = [];
+  let SKIN = [];
+
+  NODES.push(rig[1]);
+  SKIN.push(rig[2]);
+  lerpMousePos.push({x:0, y:0});
+
+  for (let i = 1; i < n; i++) {
+    let node = doodleMeta.deepCopyNodes(rig[1]);
+    let skin = doodleMeta.buildSkin(strokes, node);
+    for (j = 0; j < rig[2].length; j++) {
+      skin[j].x0 = rig[2][j].x0;
+      skin[j].y0 = rig[2][j].y0;
+    }
+
+    NODES.push(node);
+    SKIN.push(skin);
+    lerpMousePos.push({x:0, y:0});
+
+  }
+  
+	setInterval(() => {
+    try {
+
+      for (let i = 0; i < n; ++i) {
+        var canvas = document.getElementById('canvas' + i);
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // ctx.fillStyle="black";
+        // ctx.fillRect(0,0,canvas.width,canvas.height);
+        // ctx.strokeStyle="white";
+        // ctx.fillStyle="none";
+
+        let time = (new Date()).getTime();
+        
+        let nodes = NODES[i];
+        let skin = SKIN[i];
+        for (var j = 0; j < nodes.length; j++){
+          if (nodes[j].parent ){
+            var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
+            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
           }
           else
           {
@@ -1171,7 +1310,9 @@ const beginDraw = (id) => {
 			//.then(drawSheep);
 			//.then(drawVaryingWidth);
 			.then(parseSheep)
-			.then(testAnimation);
+      //.then(testAnimation);
+      //.then(saveRig);
+      .then(testAnimationRig);
 	}
 }
 
@@ -1202,7 +1343,7 @@ sliders.forEach(item => {
 	}
 })
 
-},{"file-saver":27,"socket.io-client":37}],2:[function(require,module,exports){
+},{"file-saver":27,"flatted/cjs":28,"socket.io-client":38}],2:[function(require,module,exports){
 module.exports = after
 
 function after(count, callback, err_cb) {
@@ -3480,7 +3621,7 @@ var hexSliceLookupTable = (function () {
 })()
 
 }).call(this,require("buffer").Buffer)
-},{"base64-js":6,"buffer":9,"ieee754":30}],10:[function(require,module,exports){
+},{"base64-js":6,"buffer":9,"ieee754":31}],10:[function(require,module,exports){
 /**
  * Slice reference.
  */
@@ -3946,7 +4087,7 @@ formatters.j = function (v) {
 };
 
 }).call(this,require('_process'))
-},{"./common":14,"_process":36}],14:[function(require,module,exports){
+},{"./common":14,"_process":37}],14:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -4214,7 +4355,7 @@ function setup(env) {
 
 module.exports = setup;
 
-},{"ms":33}],15:[function(require,module,exports){
+},{"ms":34}],15:[function(require,module,exports){
 
 module.exports = require('./socket');
 
@@ -4976,7 +5117,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
   return filteredUpgrades;
 };
 
-},{"./transport":17,"./transports/index":18,"component-emitter":11,"debug":13,"engine.io-parser":24,"indexof":31,"parseqs":34,"parseuri":35}],17:[function(require,module,exports){
+},{"./transport":17,"./transports/index":18,"component-emitter":11,"debug":13,"engine.io-parser":24,"indexof":32,"parseqs":35,"parseuri":36}],17:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -6103,7 +6244,7 @@ Polling.prototype.uri = function () {
   return schema + '://' + (ipv6 ? '[' + this.hostname + ']' : this.hostname) + port + this.path + query;
 };
 
-},{"../transport":17,"component-inherit":12,"debug":13,"engine.io-parser":24,"parseqs":34,"xmlhttprequest-ssl":23,"yeast":49}],22:[function(require,module,exports){
+},{"../transport":17,"component-inherit":12,"debug":13,"engine.io-parser":24,"parseqs":35,"xmlhttprequest-ssl":23,"yeast":50}],22:[function(require,module,exports){
 (function (Buffer){
 /**
  * Module dependencies.
@@ -6402,7 +6543,7 @@ WS.prototype.check = function () {
 };
 
 }).call(this,require("buffer").Buffer)
-},{"../transport":17,"buffer":9,"component-inherit":12,"debug":13,"engine.io-parser":24,"parseqs":34,"ws":8,"yeast":49}],23:[function(require,module,exports){
+},{"../transport":17,"buffer":9,"component-inherit":12,"debug":13,"engine.io-parser":24,"parseqs":35,"ws":8,"yeast":50}],23:[function(require,module,exports){
 // browser shim for xmlhttprequest module
 
 var hasCORS = require('has-cors');
@@ -6441,7 +6582,7 @@ module.exports = function (opts) {
   }
 };
 
-},{"has-cors":29}],24:[function(require,module,exports){
+},{"has-cors":30}],24:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -7048,7 +7189,7 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
   });
 };
 
-},{"./keys":25,"./utf8":26,"after":2,"arraybuffer.slice":3,"base64-arraybuffer":5,"blob":7,"has-binary2":28}],25:[function(require,module,exports){
+},{"./keys":25,"./utf8":26,"after":2,"arraybuffer.slice":3,"base64-arraybuffer":5,"blob":7,"has-binary2":29}],25:[function(require,module,exports){
 
 /**
  * Gets the keys for an object.
@@ -7288,6 +7429,124 @@ module.exports = {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],28:[function(require,module,exports){
+var Flatted = (function (Primitive, primitive) {
+
+  /*!
+   * ISC License
+   *
+   * Copyright (c) 2018, Andrea Giammarchi, @WebReflection
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+   * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+   * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+   * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+   * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+   * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+   * PERFORMANCE OF THIS SOFTWARE.
+   */
+
+  var Flatted = {
+
+    parse: function parse(text, reviver) {
+      var input = JSON.parse(text, Primitives).map(primitives);
+      var value = input[0];
+      var $ = reviver || noop;
+      var tmp = typeof value === 'object' && value ?
+                  revive(input, new Set, value, $) :
+                  value;
+      return $.call({'': tmp}, '', tmp);
+    },
+
+    stringify: function stringify(value, replacer, space) {
+      for (var
+        firstRun,
+        known = new Map,
+        input = [],
+        output = [],
+        $ = replacer && typeof replacer === typeof input ?
+              function (k, v) {
+                if (k === '' || -1 < replacer.indexOf(k)) return v;
+              } :
+              (replacer || noop),
+        i = +set(known, input, $.call({'': value}, '', value)),
+        replace = function (key, value) {
+          if (firstRun) {
+            firstRun = !firstRun;
+            return value;
+            // this was invoking twice each root object
+            // return i < 1 ? value : $.call(this, key, value);
+          }
+          var after = $.call(this, key, value);
+          switch (typeof after) {
+            case 'object':
+              if (after === null) return after;
+            case primitive:
+              return known.get(after) || set(known, input, after);
+          }
+          return after;
+        };
+        i < input.length; i++
+      ) {
+        firstRun = true;
+        output[i] = JSON.stringify(input[i], replace, space);
+      }
+      return '[' + output.join(',') + ']';
+    }
+
+  };
+
+  return Flatted;
+
+  function noop(key, value) {
+    return value;
+  }
+
+  function revive(input, parsed, output, $) {
+    return Object.keys(output).reduce(
+      function (output, key) {
+        var value = output[key];
+        if (value instanceof Primitive) {
+          var tmp = input[value];
+          if (typeof tmp === 'object' && !parsed.has(tmp)) {
+            parsed.add(tmp);
+            output[key] = $.call(output, key, revive(input, parsed, tmp, $));
+          } else {
+            output[key] = $.call(output, key, tmp);
+          }
+        } else
+          output[key] = $.call(output, key, value);
+        return output;
+      },
+      output
+    );
+  }
+
+  function set(known, input, value) {
+    var index = Primitive(input.push(value) - 1);
+    known.set(value, index);
+    return index;
+  }
+
+  // the two kinds of primitives
+  //  1. the real one
+  //  2. the wrapped one
+
+  function primitives(value) {
+    return value instanceof Primitive ? Primitive(value) : value;
+  }
+
+  function Primitives(key, value) {
+    return typeof value === primitive ? new Primitive(value) : value;
+  }
+
+}(String, 'string'));
+module.exports = Flatted;
+
+},{}],29:[function(require,module,exports){
 (function (Buffer){
 /* global Blob File */
 
@@ -7355,7 +7614,7 @@ function hasBinary (obj) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":9,"isarray":32}],29:[function(require,module,exports){
+},{"buffer":9,"isarray":33}],30:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -7374,7 +7633,7 @@ try {
   module.exports = false;
 }
 
-},{}],30:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = (nBytes * 8) - mLen - 1
@@ -7460,7 +7719,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 
 var indexOf = [].indexOf;
 
@@ -7471,14 +7730,14 @@ module.exports = function(arr, obj){
   }
   return -1;
 };
-},{}],32:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],33:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -7642,7 +7901,7 @@ function plural(ms, msAbs, n, name) {
   return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
 }
 
-},{}],34:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 /**
  * Compiles a querystring
  * Returns string representation of the object
@@ -7681,7 +7940,7 @@ exports.decode = function(qs){
   return qry;
 };
 
-},{}],35:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -7722,7 +7981,7 @@ module.exports = function parseuri(str) {
     return uri;
 };
 
-},{}],36:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -7908,7 +8167,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],37:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -8004,7 +8263,7 @@ exports.connect = lookup;
 exports.Manager = require('./manager');
 exports.Socket = require('./socket');
 
-},{"./manager":38,"./socket":40,"./url":41,"debug":13,"socket.io-parser":43}],38:[function(require,module,exports){
+},{"./manager":39,"./socket":41,"./url":42,"debug":13,"socket.io-parser":44}],39:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -8579,7 +8838,7 @@ Manager.prototype.onreconnect = function () {
   this.emitAll('reconnect', attempt);
 };
 
-},{"./on":39,"./socket":40,"backo2":4,"component-bind":10,"component-emitter":11,"debug":13,"engine.io-client":15,"indexof":31,"socket.io-parser":43}],39:[function(require,module,exports){
+},{"./on":40,"./socket":41,"backo2":4,"component-bind":10,"component-emitter":11,"debug":13,"engine.io-client":15,"indexof":32,"socket.io-parser":44}],40:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -8605,7 +8864,7 @@ function on (obj, ev, fn) {
   };
 }
 
-},{}],40:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -9045,7 +9304,7 @@ Socket.prototype.binary = function (binary) {
   return this;
 };
 
-},{"./on":39,"component-bind":10,"component-emitter":11,"debug":13,"has-binary2":28,"parseqs":34,"socket.io-parser":43,"to-array":48}],41:[function(require,module,exports){
+},{"./on":40,"component-bind":10,"component-emitter":11,"debug":13,"has-binary2":29,"parseqs":35,"socket.io-parser":44,"to-array":49}],42:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -9122,7 +9381,7 @@ function url (uri, loc) {
   return obj;
 }
 
-},{"debug":13,"parseuri":35}],42:[function(require,module,exports){
+},{"debug":13,"parseuri":36}],43:[function(require,module,exports){
 /*global Blob,File*/
 
 /**
@@ -9265,7 +9524,7 @@ exports.removeBlobs = function(data, callback) {
   }
 };
 
-},{"./is-buffer":44,"isarray":32}],43:[function(require,module,exports){
+},{"./is-buffer":45,"isarray":33}],44:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -9682,7 +9941,7 @@ function error(msg) {
   };
 }
 
-},{"./binary":42,"./is-buffer":44,"component-emitter":11,"debug":45,"isarray":32}],44:[function(require,module,exports){
+},{"./binary":43,"./is-buffer":45,"component-emitter":11,"debug":46,"isarray":33}],45:[function(require,module,exports){
 (function (Buffer){
 
 module.exports = isBuf;
@@ -9706,7 +9965,7 @@ function isBuf(obj) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":9}],45:[function(require,module,exports){
+},{"buffer":9}],46:[function(require,module,exports){
 (function (process){
 /**
  * This is the web browser implementation of `debug()`.
@@ -9905,7 +10164,7 @@ function localstorage() {
 }
 
 }).call(this,require('_process'))
-},{"./debug":46,"_process":36}],46:[function(require,module,exports){
+},{"./debug":47,"_process":37}],47:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -10132,7 +10391,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":47}],47:[function(require,module,exports){
+},{"ms":48}],48:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -10286,7 +10545,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],48:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 module.exports = toArray
 
 function toArray(list, index) {
@@ -10301,7 +10560,7 @@ function toArray(list, index) {
     return array
 }
 
-},{}],49:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 'use strict';
 
 var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'.split('')

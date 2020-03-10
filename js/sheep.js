@@ -341,7 +341,7 @@ var doodleMeta = new function(){
     
     that.deepCopyNodes = function(nodes){
   
-      var nnodes = []
+      var nnodes = [];
       for (var i = 0; i < nodes.length; i++){
         var n = nodes[i]
         nnodes.push({
@@ -349,7 +349,8 @@ var doodleMeta = new function(){
           th0:n.th0,
           thabs:n.thabs,
           r : n.r,
-          id: n.id,
+          //id: n.id,
+          id : that.randomId(),
           type: n.type,
           x: n.x,
           y: n.y,
@@ -415,7 +416,7 @@ var doodleMeta = new function(){
     }
   
   
-    that.buildSkin = function(strokes,nodes){
+    that.buildSkin = function(strokes, nodes){
       if (strokes == undefined || nodes == undefined || !strokes.length || !nodes.length){
         return [];
       }
@@ -696,6 +697,8 @@ var FileSaver = require('file-saver');
 
 var io = require('socket.io-client');
 
+const {parse, stringify} = require('flatted/cjs');
+
 // var $ = require("jquery");
 
 // const numRow = 5;
@@ -835,8 +838,8 @@ let drawSequence = [];
 
 var FAT = 15;
 var BLEED = 5;
-let NODES = [];
-let SKIN = []
+//let NODES = [];
+//let SKIN = []
 
 let lastPos = null;
 
@@ -879,6 +882,47 @@ var parseSheep = (sheep) => {
 	
 }
 
+var saveRig = (strokes) => {
+  doodleRig.checkOpenCVReady(() => {console.log('cv ready'); });
+  var canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d');
+  ctx.lineWidth = 1;
+  ctx.fillStyle="white";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle="black";
+  draw_strokes(ctx, strokes);
+
+  doodleRig.setup({
+    width:canvas.width,
+    height:canvas.height,
+    fat:FAT,
+    bleed:BLEED,
+    canvasId:'canvas'
+    });
+
+  var ret = doodleRig.process(strokes);
+
+  var allNodes = {};
+
+  let skin = ret.skin;
+  for (let j = 0; j < skin.length; j++) {
+    skin[j].x0 = parseFloat(j) / skin.length * canvas.width;
+    skin[j].y0 = canvas.height * 0.5;
+  }
+
+  ret.nodes.forEach((item) => {
+    allNodes[item.id] = stringify(item);
+  })
+
+  //var blob = new Blob(, {type: "text/plain;charset=utf-8"});
+  var s = stringify([allNodes, ret.nodes, ret.skin]);
+  FileSaver.saveAs(new Blob([s]), id + "_rig.json");
+
+  id = id + 1;
+
+  beginDraw(id);
+}
+
 
 const n = 10;
 
@@ -904,7 +948,7 @@ var testAnimation = (strokes) => {
       fat:FAT,
       bleed:BLEED,
       canvasId:'canvas'+i
-      })
+      });
 
     // generate skeleton
     var ret = doodleRig.process(strokes);
@@ -946,7 +990,103 @@ var testAnimation = (strokes) => {
         for (var j = 0; j < nodes.length; j++){
           if (nodes[j].parent ){
             var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
-            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.003/r+r*Math.PI*2)*r*0.8*Math.sin(i+1);
+            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
+          }
+          else
+          {
+            nodes[j].th = nodes[j].th0;
+          }
+        }
+        doodleMeta.forwardKinematicsNodes(nodes);
+        doodleMeta.calculateSkin(skin);
+          
+        ctx.strokeStyle="black";  
+        ctx.fillStyle = "none";
+        ctx.lineWidth = 1.0 + Math.random()*2;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        
+        let t = time * 0.008;
+        for (var j = 0; j < skin.length; j++){
+          let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
+          let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
+
+          // let target_x = lerp(x0, skin[j].x, Math.abs(mousePos.x - window.innerWidth*0.5) / (window.innerWidth*0.5));
+          // let target_y = lerp(y0, skin[j].y, Math.abs(mousePos.y - window.innerHeight*0.5) / (window.innerHeight*0.5));
+          lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
+          lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
+          let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
+          let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
+          // let target_x = skin[j].x;
+          // let target_y = skin[j].y;
+          if (!skin[j].connect){
+            if (j != 0){
+            ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.moveTo(target_x, target_y);
+          }else{
+            ctx.lineTo(target_x, target_y);
+          }
+        }
+        ctx.stroke();
+      }
+    }catch(e) {
+      console.log(e);
+    }
+    
+	}, 30);
+}
+
+
+var testAnimationRig = async (strokes) => {
+  let response = await fetch('data/rig/' + id + '_rig.json');
+  let data = await response.text();
+  //console.log(data);
+  let rig = parse(data);
+  //console.log(rig);
+
+  let NODES = [];
+  let SKIN = [];
+
+  NODES.push(rig[1]);
+  SKIN.push(rig[2]);
+  lerpMousePos.push({x:0, y:0});
+
+  for (let i = 1; i < n; i++) {
+    let node = doodleMeta.deepCopyNodes(rig[1]);
+    let skin = doodleMeta.buildSkin(strokes, node);
+    for (j = 0; j < rig[2].length; j++) {
+      skin[j].x0 = rig[2][j].x0;
+      skin[j].y0 = rig[2][j].y0;
+    }
+
+    NODES.push(node);
+    SKIN.push(skin);
+    lerpMousePos.push({x:0, y:0});
+
+  }
+  
+	setInterval(() => {
+    try {
+
+      for (let i = 0; i < n; ++i) {
+        var canvas = document.getElementById('canvas' + i);
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // ctx.fillStyle="black";
+        // ctx.fillRect(0,0,canvas.width,canvas.height);
+        // ctx.strokeStyle="white";
+        // ctx.fillStyle="none";
+
+        let time = (new Date()).getTime();
+        
+        let nodes = NODES[i];
+        let skin = SKIN[i];
+        for (var j = 0; j < nodes.length; j++){
+          if (nodes[j].parent ){
+            var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
+            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
           }
           else
           {
@@ -1169,7 +1309,9 @@ const beginDraw = (id) => {
 			//.then(drawSheep);
 			//.then(drawVaryingWidth);
 			.then(parseSheep)
-			.then(testAnimation);
+      //.then(testAnimation);
+      //.then(saveRig);
+      .then(testAnimationRig);
 	}
 }
 
