@@ -543,13 +543,9 @@ var doodleMeta = new function(){
       context.lineWidth = FAT;
       context.lineCap = "round";
       context.lineJoin = "round";
-      draw_strokes(context,strokes);
-      var nodes = cv_nodes(strokes, args);
-    var skin = doodleMeta.buildSkin(strokes,nodes);
-    
-    console.log(nodes, skin);
-	  
-	  console.log("build skin finish");
+      //draw_strokes(context,strokes);
+      var nodes = cv_nodes(strokes,args);
+      var skin = doodleMeta.buildSkin(strokes,nodes);
       
       return {nodes:nodes, skin:skin};
     }
@@ -608,7 +604,6 @@ var doodleMeta = new function(){
       if (args == undefined){args = {}}
       try{
         var src = cv.imread(canvas.id);
-        console.log("source img", src);
       }
       catch(e){
         console.log(e);
@@ -634,33 +629,32 @@ var doodleMeta = new function(){
       skeletonization.skeletonize(src,{
         preprocess: false,
         bbox: bbox
-	  });
-
-	  console.log("skeleton finish");
+      });
   
-    try {
       var tree = doodleMeta.inferTreeFromMat(src,8);
-        console.log(tree);
-        doodleMeta.filterTree(tree,0.5);
-        doodleMeta.simplifyTree(tree);
-        doodleMeta.filterTree(tree,0.5);
-        doodleMeta.simplifyTree(tree);
-        doodleMeta.filterTree(tree,0.5);
-        tree = doodleMeta.centerTree(tree,args.center || {x:WIDTH/2,y:HEIGHT/2,types:["node"]})
-        src.delete();
+      doodleMeta.filterTree(tree,0.5);
+      doodleMeta.simplifyTree(tree);
+      doodleMeta.filterTree(tree,0.5);
+      doodleMeta.simplifyTree(tree);
+      doodleMeta.filterTree(tree,0.5);
+      tree = doodleMeta.centerTree(tree,args.center || {x:WIDTH/2,y:HEIGHT/2,types:["node"]})
+      src.delete();
       var nodes = doodleMeta.parameterizeTreeToNodes(tree);
-    }
-    catch(e) {
-      console.log("error in tree generation", e);
-      return null;
-    }
-	  
-	  console.log("convert to nodes finish");
       return nodes;
     }
   
   
 }
+  
+
+
+// var STROKES = [];
+// var FAT = 15;
+// var BLEED = 5;
+
+// var NODES = [];
+// var SKIN = []
+
 
 
 function draw_strokes(ctx, strokes){
@@ -678,524 +672,78 @@ function draw_strokes(ctx, strokes){
 }
 
 
-/////////////////////////////
-/////////////////////////////
-/////////////////////////////
-/////////////////////////////
-/////////////////////////////
-/////////////////////////////
-/////////////////////////////
-
-
-var canvas = document.getElementById('canvas');
-var ctx = canvas.getContext('2d');
-ctx.lineCap = 'round';
-ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
-
-var FileSaver = require('file-saver');
-
-var io = require('socket.io-client');
-
-// var $ = require("jquery");
-
-// const numRow = 5;
-// const numCol = 5;
-
-// for (let i = 0; i < numRow; i++) {
-// 	let row = $('<tr></tr>');
-// 	for (let j = 0; j < numCol; j++) {
-// 		row.append('<td></td>');
-// 	}
-// 	$('.canvas-grid').append(row);
-// }
-
-var socket;
-
-var initSocket = setInterval(() => {
-	socket = io('http://localhost:8080/');
-	if (socket) {
-		socket.on('connect', function(){ console.log("connected")});
-		socket.on('disconnect', function(){ console.log("disconnected")});
-		socket.emit("message", "connected!");
-		clearInterval(initSocket);
-
-		socket.on('drawSegment', (data) => {
-			drawSegment(data);
-		});
-
-		socket.on('drawSegmentGrid', (data) => {
-			drawSegmentGrid(data);
-		})
-
-		socket.on('endGrid', () => {
-			console.log("end drawing");
-			// for (let id = 0; id < 25; id++) {
-			// 	let canvas = document.getElementById('canvas'+id);
-			// 	canvas.toBlob(function(blob) {
-			// 			FileSaver.saveAs(blob, 'grid' + id + ".png");
-			// 		});
-			// }
-		})
-
-		socket.on('end', () => {
-			id = id + 1;
-			ctx.clearRect(0, 0, canvas.width, canvas.height)
-			beginDraw(id);
-		})
-	}
-}, 1000);
-
-
-
-var parseQuery = function(query) {
-	query = query.trim();
-	if (query[0] === '?') {
-		query = query.substr(1);
-	}
-	var ret = {};
-	query.split('&').forEach(function(part) {
-		var a = part.split('=');
-		ret[a[0]] = a[1];
-	});
-	return ret;
-};
-
-var grayToColor = function(gray) {
-	var c = ('00' + gray.toString(16)).substr(-2);
-	return '#' + c + c + c;
-};
-
-var eachWithTimeout = function(array, fn, timeout) {
-	return new Promise(function(resolve, reject) {
-		var tmp = function(i) {
-			if (i >= array.length) {
-                //resolve();
-                // canvas.toBlob(function(blob) {
-                //     FileSaver.saveAs(blob, (id - 1) + ".png");
-				// });
-				ctx.clearRect(0, 0, canvas.width, canvas.height);
-                id = id + 1;
-                fetch('data/' + id + '.txt')
-                .then(r => r.text())
-                .then(parseQuery)
-                .then(drawVaryingWidth);
-                
-			} else {
-				setTimeout(function() {
-					fn(array[i]);
-					tmp(i + 1);
-				}, timeout);
-			}
-		};
-		tmp(0);
-	});
-};
-
-var drawSheep = function(sheep) {
-	var xOff = parseFloat(sheep.xOff, 10);
-	var yOff = parseFloat(sheep.yOff, 10);
-
-	ctx.beginPath();
-	return eachWithTimeout(sheep.drawing.split('_'), function(s) {
-		cmd = s.split('.');
-
-		if (cmd[0] === 'lift') {
-			ctx.beginPath();
-		} else if (cmd[0] === 'stroke') {
-			ctx.lineWidth = parseInt(cmd[1], 10);
-		} else if (cmd[0] === 'grey') {
-			ctx.strokeStyle = grayToColor(parseInt(cmd[1], 10));
-		} else if (parseInt(cmd[0], 10)) {
-			var coords = cmd.map(x => parseInt(x, 10));
-			ctx.moveTo(coords[2] + xOff, coords[3] + yOff);
-			ctx.lineTo(coords[0] + xOff, coords[1] + yOff);
-			ctx.stroke();
-		}
-	}, 0.1);
-};
-
-let mousePos = {x: 0, y: 0};
-
-function getMousePos(e) {
-  return {x:e.clientX,y:e.clientY};
-}
-document.onmousemove=function(e) {
-  mousePos = getMousePos(e);
-};
-
-
-let width = 1;
-let minWidth = 0.2;
-let maxWidth = 2;
-let deltaWidth = 0.05;
-let lastDistance = 0.0;
-let firstStroke = true;
-
-let drawSequence = [];
-
-var FAT = 15;
-var BLEED = 5;
-let NODES = [];
-let SKIN = []
-
-let lastPos = null;
-
-var distance = (x1, y1, x2, y2) => {
-    return Math.sqrt((x1 - x2)**2 + (y1 - y2)**2);
-}
-
-var lerp = (x0, x1, t) => {
-  return x0 + (x1 - x0) * t;
-}
-
-var powerLerp = (x0, x1, t, k) => {
-  return x0 + (x1 - x0) * Math.pow(t, k);
-}
-
-var parseSheep = (sheep) => {
-	var xOff = parseFloat(sheep.xOff, 10);
-	var yOff = parseFloat(sheep.yOff, 10);
-	
-	let commands = sheep.drawing.split('_');
-	let seq = [];
-	commands.forEach(s => {
-		cmd = s.split('.');
-		if (cmd[0] === 'lift') {
-			if (seq.length > 1) {
-				drawSequence.push(seq.slice());
-			}
-			seq = [];
-		}
-		else if (parseInt(cmd[0], 10)) {
-			coords = cmd.map(x => parseInt(x, 10));
-			seq.push([coords[0] + xOff, coords[1] + yOff]);
-		}
-	})
-
-	socket.emit('draw', drawSequence);
-	let testDrawSequence = drawSequence.slice();
-	drawSequence = [];
-	return testDrawSequence;
-	
+function main(){
+  context.lineWidth = 1;
+  context.fillStyle="white";
+  context.fillRect(0,0,WIDTH,HEIGHT);
+  context.strokeStyle="black";
+  draw_strokes(context);
 }
 
 
-const n = 10;
-
-let lerpMousePos = [];
-
-var testAnimation = (strokes) => {
-  doodleRig.checkOpenCVReady(() => {console.log('cv ready'); })
-  
-
-  for (let i = 0; i < n; i++) {
-    var canvas = document.getElementById('canvas' + i);
-    var ctx = canvas.getContext('2d');
-    ctx.lineWidth = 1;
-    ctx.fillStyle="white";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle="black";
-    draw_strokes(ctx, strokes);
-
-    // setup rig
-    doodleRig.setup({
-      width:canvas.width,
-      height:canvas.height,
-      fat:FAT,
-      bleed:BLEED,
-      canvasId:'canvas'+i
-      })
-
-    // generate skeleton
-    var ret = doodleRig.process(strokes);
-
-    // make copies
-    //for (let i = 0; i < n; i++) {
-      let skin = ret.skin;
-      for (let j = 0; j < skin.length; j++) {
-        skin[j].x0 = parseFloat(j) / skin.length * canvas.width;
-        skin[j].y0 = canvas.height * 0.5;
+function test_animate(){
+  if (AUTO_ANIM){
+    for (var i = 0; i < NODES.length; i++){
+      if (NODES[i].parent ){
+        var r = Math.min(Math.max(parseFloat(atob(NODES[i].id)),0.3),0.7);
+        NODES[i].th = NODES[i].th0 + Math.sin((new Date()).getTime()*0.003/r+r*Math.PI*2)*r*0.5;
+      }else{
+        NODES[i].th = NODES[i].th0
       }
+    }
+  }
+  doodleMeta.forwardKinematicsNodes(NODES);
+  doodleMeta.calculateSkin(SKIN);
+  anim_render();
+}
 
-      NODES.push(ret.nodes)
-      SKIN.push(ret.skin);
-
-      lerpMousePos.push({x:0, y:0});
-
-    //}
-
+function anim_render(){
+  anim_context.fillStyle="white";
+  anim_context.fillRect(0,0,WIDTH,HEIGHT);
+  
+  if (SHOW_NODES){
+    anim_context.fillStyle = "none";
+    anim_context.lineWidth = 1;
+    
+    for (var i = 0; i < SKIN.length; i++){
+      for (var j = 0; j < SKIN[i].anchors.length; j++){
+        var a = SKIN[i].anchors[j]
+        anim_context.strokeStyle = Okb.color.css(0,0,0,a.w*0.5)
+        anim_context.beginPath();
+        anim_context.moveTo(a.node.x,a.node.y);
+        anim_context.lineTo(SKIN[i].x,SKIN[i].y);
+        anim_context.stroke();
+      }
+    }
+    anim_context.lineWidth = 1.5;
+    anim_context.strokeStyle="red"; 
+    doodleMeta.drawTree(anim_canvas,NODES[0]);
+  }
+  if (SHOW_NODES || SHOW_SEL_NODE){
+    
+    anim_context.fillStyle = "magenta";
+    var p = NODES[SEL_NODE%NODES.length];
+    if (p){
+      anim_context.fillRect(p.x-5,p.y-5,10,10)
+    }
   }
   
-
-	setInterval(() => {
-    try {
-
-      for (let i = 0; i < n; ++i) {
-        var canvas = document.getElementById('canvas' + i);
-        var ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // ctx.fillStyle="black";
-        // ctx.fillRect(0,0,canvas.width,canvas.height);
-        // ctx.strokeStyle="white";
-        // ctx.fillStyle="none";
-
-        let time = (new Date()).getTime();
-        
-        let nodes = NODES[i];
-        let skin = SKIN[i];
-        for (var j = 0; j < nodes.length; j++){
-          if (nodes[j].parent ){
-            var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
-            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.003/r+r*Math.PI*2)*r*0.8*Math.sin(i+1);
-          }
-          else
-          {
-            nodes[j].th = nodes[j].th0;
-          }
-        }
-        doodleMeta.forwardKinematicsNodes(nodes);
-        doodleMeta.calculateSkin(skin);
-          
-        ctx.strokeStyle="black";  
-        ctx.fillStyle = "none";
-        ctx.lineWidth = 1.0 + Math.random()*2;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        
-        let t = time * 0.008;
-        for (var j = 0; j < skin.length; j++){
-          let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
-          let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
-
-          // let target_x = lerp(x0, skin[j].x, Math.abs(mousePos.x - window.innerWidth*0.5) / (window.innerWidth*0.5));
-          // let target_y = lerp(y0, skin[j].y, Math.abs(mousePos.y - window.innerHeight*0.5) / (window.innerHeight*0.5));
-          lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
-          lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
-          let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
-          let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
-          // let target_x = skin[j].x;
-          // let target_y = skin[j].y;
-          if (!skin[j].connect){
-            if (j != 0){
-            ctx.stroke();
-            }
-            ctx.beginPath();
-            ctx.moveTo(target_x, target_y);
-          }else{
-            ctx.lineTo(target_x, target_y);
-          }
-        }
-        ctx.stroke();
+  anim_context.strokeStyle="black";  
+  anim_context.fillStyle = "none";
+  anim_context.lineWidth = 2;
+  anim_context.lineJoin = "round";
+  anim_context.lineCap = "round";
+  
+  for (var i = 0; i < SKIN.length; i++){
+    if (!SKIN[i].connect){
+      if (i != 0){
+        anim_context.stroke();
       }
-    }catch(e) {
-      console.log(e);
+      anim_context.beginPath();
+      anim_context.moveTo(SKIN[i].x, SKIN[i].y);
+    }else{
+      anim_context.lineTo(SKIN[i].x, SKIN[i].y);
     }
-    
-	}, 30);
+  }
+  anim_context.stroke();
 }
-
-// draw a sequence sent from server
-var drawSegment = function(data) {
-	if (data.length <= 1) {
-		firstStroke = true;
-		return;
-	}
-
-	if (!lastPos) {
-		lastPos = data[0];
-	}
-
-	//ctx.beginPath();
-	//ctx.moveTo(lastPos[0], lastPos[1]);
-
-	data.forEach((coord, i) => {
-		if (i > 0) {
-			let x = coord[0];
-			let y = coord[1];
-			if (x === 0 && y === 0) {
-				width = minWidth;
-				ctx.lineWidth = width;
-				firstStroke = true;
-			}
-			else {
-				ctx.beginPath()
-				let d = coord[2];
-				if (d > lastDistance) {
-					width = Math.max(minWidth, width - deltaWidth);
-				}
-				else if (d < lastDistance) {
-					width = Math.min(maxWidth, width + deltaWidth);
-				}
-				lastDistance = d;
-				ctx.lineWidth = width;
-				if (firstStroke) {
-					firstStroke = false;
-					ctx.moveTo(x,y);
-				}
-				else if (distance(x, y, lastPos[0], lastPos[1]) < 50) {
-					ctx.moveTo(lastPos[0], lastPos[1]);
-					ctx.lineTo(x, y);
-				}
-				lastPos = [x, y];
-				//ctx.fillStyle = 'rgba(255,255,255,0.003)';
-            	//ctx.fillRect(0, 0, canvas.width, canvas.height);
-				ctx.stroke();
-			}
-		}
-	})
-
-}
-
-var grid = {};
-const nRow = 5;
-const nCol = 5;
-
-var initGrid = function() {
-	for (let i = 0; i < nRow; i++) {
-		for (let j = 0; j < nCol; j++) {
-			let idx = i * nCol + j;
-			grid[idx] = {firstStroke: true, lastPos: [0, 0], width: minWidth, lastDistance: 0};
-		}
-	}
-}
-
-initGrid();
-
-// draw a sequence on a canvas of the grid
-var drawSegmentGrid = function(data) {
-	let idx = data.id;
-	var canvas = document.getElementById('canvas' + idx);
-	var ctx = canvas.getContext('2d');
-	ctx.lineCap = 'round';
-	ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
-
-	let seq = data.seq;
-
-	if (grid === {}) { initGrid();}
-
-	//console.log("receive segment", data);
-	if (seq.length <= 1) {
-		grid[idx].firstStroke = true;
-		return;
-	}
-
-	seq.forEach((coord, i) => {
-		if (i > 0) {
-			let x = coord[0];
-			let y = coord[1];
-			if (x === 0 && y === 0) {
-				grid[idx].width = minWidth;
-				ctx.lineWidth = grid[idx].width;
-				grid[idx].firstStroke = true;
-			}
-			else {
-				ctx.beginPath()
-				let d = coord[2];
-				if (d > grid[idx].lastDistance) {
-					grid[idx].width = Math.max(minWidth, grid[idx].width - deltaWidth);
-				}
-				else if (d < grid[idx].lastDistance) {
-					grid[idx].width = Math.min(maxWidth, grid[idx].width + deltaWidth);
-				}
-				grid[idx].lastDistance = d;
-				ctx.lineWidth = grid[idx].width;
-				if (grid[idx].firstStroke) {
-					grid[idx].firstStroke = false;
-					ctx.moveTo(x,y);
-				}
-				else if (distance(x, y, grid[idx].lastPos[0], grid[idx].lastPos[1]) < 50) {
-					ctx.moveTo(grid[idx].lastPos[0], grid[idx].lastPos[1]);
-					ctx.lineTo(x, y);
-				}
-				grid[idx].lastPos = [x, y];
-				//ctx.fillStyle = 'rgba(255,255,255,0.003)';
-            	//ctx.fillRect(0, 0, canvas.width, canvas.height);
-				ctx.stroke();
-			}
-		}
-	});
-
-
-}
-
-
-var drawVaryingWidth = function(sheep) {
-	var xOff = parseFloat(sheep.xOff, 10);
-    var yOff = parseFloat(sheep.yOff, 10);
-    
-
-	//ctx.beginPath();
-	return eachWithTimeout(sheep.drawing.split('_'), function(s) {
-		cmd = s.split('.');
-
-		if (cmd[0] === 'lift') {
-            width = minWidth;
-            ctx.lineWidth = width;
-		} else if (cmd[0] === 'stroke') {
-			//ctx.lineWidth = parseInt(cmd[1], 10);
-		} else if (cmd[0] === 'grey') {
-			ctx.strokeStyle = grayToColor(parseInt(cmd[1], 10));
-		} else if (parseInt(cmd[0], 10)) {
-            ctx.beginPath();
-            var coords = cmd.map(x => parseInt(x, 10));
-            let d = distance(coords[2], coords[3], coords[0], coords[1]);
-            if (d > lastDistance * 1.1) {
-                width = Math.max(minWidth, width - deltaWidth);
-            }
-            else if (d < lastDistance * 0.9) {
-                width = Math.min(maxWidth, width + deltaWidth);
-            }
-            ctx.lineWidth = width;
-            lastDistance = d;
-			ctx.moveTo(coords[2] + xOff, coords[3] + yOff);
-			ctx.lineTo(coords[0] + xOff, coords[1] + yOff);
-            ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.003)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-		}
-	}, 5);
-};
-
-var q = parseQuery(location.search);
-var id = parseInt(q.sheep, 10);
-
-const beginDraw = (id) => {
-	if (id) {
-		const sheepId = document.getElementById('current_sheep_id');
-		sheepId.innerHTML = id;
-		fetch('data/' + id + '.txt')
-			.then(r => r.text())
-			.then(parseQuery)
-			//.then(drawSheep);
-			//.then(drawVaryingWidth);
-			.then(parseSheep)
-			.then(testAnimation);
-	}
-}
-
-beginDraw(id);
-
-const sheepInput = document.querySelector('input');
-sheepInput.addEventListener('keyup', (e) => {
-	if (e.keyCode == 13) { // enter
-		id = parseInt(sheepInput.value, 10);
-		beginDraw(id);
-	}
-});
-
-let sliders = ['latent_x', 'latent_y', 'smooth_window', 
-'smooth_iterations', 'delta_scale_x', 'delta_scale_y', 
-'segment_delta', 'delta_scale_2_x', 'delta_scale_2_y']
-
-sliders.forEach(item => {
-	let slider = document.getElementById(item);
-	let output = document.getElementById(item + '_val');
-	output.innerHTML = slider.value;
-
-	slider.oninput = function() {
-		output.innerHTML = this.value;
-		json = JSON.parse('{"' + item + '": ' + this.value + '}')
-		socket.emit('setting', json);
-		console.log('set', json);
-	}
-})

@@ -42,7 +42,7 @@ function html() {
 
 function watchJs() {
 
-	watch(['./js/*.js'], function() {
+	watch(['./js/**/*.js'], function() {
 		gulp.start('js');
 	});
 }
