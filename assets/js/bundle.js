@@ -687,9 +687,11 @@ function draw_strokes(ctx, strokes){
 /////////////////////////////
 /////////////////////////////
 
+const REPLAY = true;
 
-var canvas = document.getElementById('canvas');
-var ctx = canvas.getContext('2d');
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
 ctx.lineCap = 'round';
 ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
 
@@ -728,7 +730,22 @@ var initSocket = setInterval(() => {
 
 		socket.on('drawSegmentGrid', (data) => {
 			drawSegmentGrid(data);
-		})
+    });
+    
+    socket.on('finish', () => {
+      console.log("finish!");
+      console.log(grid);
+      let record = {};
+      for (let i = 0; i < nRow; i++) {
+        for (let j = 0; j < nCol; j++) {
+          let idx = i * nCol + j;
+          record[idx] = grid[idx].history;
+        }
+      }
+
+      var s = JSON.stringify(record);
+      FileSaver.saveAs(new Blob([s]), "record.json");
+    });
 
 		socket.on('endGrid', () => {
       console.log("end drawing");
@@ -929,17 +946,17 @@ var parseJsonSheep = (data) => {
 
 let mousePos = {x: 0, y: 0};
 
-function getMousePos(e) {
-  return {x:e.clientX,y:e.clientY};
-}
-document.onmousemove=function(e) {
-  mousePos = getMousePos(e);
-};
+// function getMousePos(e) {
+//   return {x:e.clientX,y:e.clientY};
+// }
+// document.onmousemove=function(e) {
+//   mousePos = getMousePos(e);
+// };
 
 
 let width = 1;
 let minWidth = 0.5;
-let maxWidth = 2.5;
+let maxWidth = 1.7;
 let deltaWidth = 0.15;
 let lastDistance = 0.0;
 let firstStroke = true;
@@ -1297,19 +1314,47 @@ var drawSegment = function(data) {
 }
 
 var grid = {};
-const nRow = 5;
-const nCol = 5;
+const nRow = 7;
+const nCol = 7;
+const SCALE = 0.7;
 
 var initGrid = function() {
 	for (let i = 0; i < nRow; i++) {
 		for (let j = 0; j < nCol; j++) {
 			let idx = i * nCol + j;
-			grid[idx] = {firstStroke: true, lastPos: {x: 0, y: 0}, width: minWidth, lastDistance: 0, strokes: []};
+			grid[idx] = {firstStroke: true, lastPos: {x: 0, y: 0}, width: minWidth, lastDistance: 0, strokes: [], history:[]};
 		}
 	}
 }
 
 initGrid();
+
+var replay = (recordData) => {
+  let record = JSON.parse(recordData);
+  let progress = {};
+  for (let i = 0; i < nRow; i++) {
+		for (let j = 0; j < nCol; j++) {
+			let idx = i * nCol + j;
+			progress[idx] = 0;
+		}
+  }
+  
+  const delta = 10;
+  setInterval(() => {
+    for (let i = 0; i < nRow; i++) {
+      for (let j = 0; j < nCol; j++) {
+        let idx = i * nCol + j;
+        let prog = progress[idx];
+        drawSegmentGrid({id: idx, data: record[idx].slice(prog, prog + delta)});
+        
+        progress[idx] += delta;
+        if (progress[idx] >= record[idx].length) {
+          clearInterval(replay);
+        }
+      }
+    }
+  }, 30);
+}
 
 // draw a sequence on a canvas of the grid
 var drawSegmentGrid = function(data) {
@@ -1317,28 +1362,32 @@ var drawSegmentGrid = function(data) {
 	var canvas = document.getElementById('canvas' + idx);
 	var ctx = canvas.getContext('2d');
 	ctx.lineCap = 'round';
-	ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.07)';
+  ctx.fillStyle = "none";
 
 	let seq = data.data;
 
 	if (grid === {}) { initGrid();}
 
-  console.log("receive segment", data);
+  if (idx == 0) console.log("receive segment", seq);
   
   let grid_state = grid[idx];
-  ctx.beginPath();
-  ctx.moveTo(grid_state.lastPos.x, grid_state.lastPos.y);
+  //ctx.beginPath();
+
+  grid_state.history = grid_state.history.concat(seq.slice());
+  
 
 	seq.forEach((cmd) => {
     let x, y;
 
     if (cmd.type == 'begin_path') {
       ctx.beginPath();
+      //ctx.moveTo(grid_state.lastPos.x * SCALE, grid_state.lastPos.y * SCALE);
       grid_state.strokes.push([])
     }
     else if (cmd.type == 'move_to') {
       [x, y] = [cmd.x, cmd.y];
-      ctx.moveTo(x, y);
+      ctx.moveTo(x * SCALE, y * SCALE);
       grid_state.lastDistance = distance(x, y, grid_state.lastPos.x, grid_state.lastPos.y);
       [grid_state.lastPos.x, grid_state.lastPos.y] = [x, y];
       let k = grid_state.strokes.length - 1;
@@ -1346,15 +1395,24 @@ var drawSegmentGrid = function(data) {
     }
     else if (cmd.type == "line_to") {
       [x, y] = [cmd.x, cmd.y];
-      ctx.lineTo(x, y);
       let d = distance(x, y, grid_state.lastPos.x, grid_state.lastPos.y);
-      if (d > grid_state.lastDistance) grid_state.width = Math.max(minWidth, grid_state.width - deltaWidth);
-      else grid_state.width = Math.min(maxWidth, grid_state.width + deltaWidth);
-      ctx.lineWidth = grid_state.width;
-      grid_state.lastDistance = d;
+      if (d < 50) {
+        ctx.lineTo(x * SCALE, y * SCALE);
+        if (d > grid_state.lastDistance) grid_state.width = Math.max(minWidth, grid_state.width - deltaWidth);
+        else grid_state.width = Math.min(maxWidth, grid_state.width + deltaWidth);
+        ctx.lineWidth = grid_state.width;
+        grid_state.lastDistance = d;
+        let k = grid_state.strokes.length - 1;
+        grid_state.strokes[k].push([x, y]);
+      }
+      else {
+        // unexpected movement
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x * SCALE, y * SCALE);
+      }
       [grid_state.lastPos.x, grid_state.lastPos.y] = [x, y];
-      let k = grid_state.strokes.length - 1;
-      grid_state.strokes[k].push([x, y]);
+      
     }
     else if (cmd.type == 'close_path') {
       ctx.stroke();
@@ -1451,6 +1509,13 @@ const beginDraw = (id) => {
 
     // return;
 
+    if (REPLAY) {
+      fetch('data/record/' + 'record.json')
+        .then(r => r.text())
+        .then(replay)
+      return;
+    }
+
 		fetch('data/' + id + '.txt')
 			.then(r => r.text())
 			.then(parseQuery)
@@ -1490,6 +1555,51 @@ sliders.forEach(item => {
 	}
 })
 
+
+let isPainting = false;
+
+var startPaint = (event) => {
+  mousePos = {
+    x: event.pageX - canvas.offsetLeft,
+    y: event.pageY - canvas.offsetTop
+  };
+  socket.emit('begin_path');
+  socket.emit('move_to', mousePos);
+  isPainting = true;
+}
+
+var paint = (event) => {
+  if (!isPainting) return;
+  ctx.fillStyle = 'none';
+  ctx.strokeStyle = 'black';
+  ctx.beginPath();
+  ctx.moveTo(mousePos.x, mousePos.y); // old pos
+  mousePos = {
+    x: event.pageX - canvas.offsetLeft,
+    y: event.pageY - canvas.offsetTop
+  };
+  ctx.lineTo(mousePos.x, mousePos.y); // new pos  
+  ctx.stroke();
+  socket.emit('line_to', mousePos);
+}
+
+var exitPaint = (event) => {
+  if (!isPainting) return;
+  mousePos = {
+    x: event.pageX - canvas.offsetLeft,
+    y: event.pageY - canvas.offsetTop
+  };
+  ctx.moveTo(mousePos.x, mousePos.y);
+  socket.emit('line_to', mousePos);
+  socket.emit('close_path');
+  isPainting = false;
+}
+
+
+canvas.addEventListener('mousedown', startPaint);
+canvas.addEventListener('mousemove', paint);
+canvas.addEventListener("mouseup", exitPaint);
+canvas.addEventListener("mouseleave", exitPaint);
 },{"file-saver":27,"flatted/cjs":28,"socket.io-client":38}],2:[function(require,module,exports){
 module.exports = after
 
