@@ -687,7 +687,9 @@ function draw_strokes(ctx, strokes){
 /////////////////////////////
 
 const REPLAY = true;
+const BG_WHITE = true;
 
+document.body.style.background = BG_WHITE ? "#FFFFFF" : "#000000";
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -762,7 +764,7 @@ var beginAnimation = () => {
   for (let i = 0; i < nRow * nCol; i++) {
     let canvas = document.getElementById('canvas' + i);
     let ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = BG_WHITE ? 'white' : 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     let dummy = document.createElement("canvas");
@@ -826,7 +828,7 @@ var beginAnimation = () => {
         doodleMeta.forwardKinematicsNodes(nodes);
         doodleMeta.calculateSkin(skin);
           
-        ctx.strokeStyle="white";  
+        ctx.strokeStyle = BG_WHITE ? 'black' : 'white';
         ctx.fillStyle = "none";
         ctx.lineWidth = 1.0 + Math.random();
         ctx.lineJoin = "round";
@@ -1065,7 +1067,7 @@ const SCALE = 0.7;
 var initGrid = function() {
   canvas = document.getElementById('canvas');
   ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'black';
+  ctx.fillStyle = BG_WHITE ? 'white' : 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 	for (let i = 0; i < nRow; i++) {
@@ -1074,7 +1076,7 @@ var initGrid = function() {
       grid[idx] = {firstStroke: true, lastPos: {x: 0, y: 0}, width: minWidth, lastDistance: 0, strokes: [], history:[]};
       var canvas = document.getElementById('canvas' + idx);
       var ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'black';
+      ctx.fillStyle = BG_WHITE ? 'white' : 'black';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 		}
 	}
@@ -1121,7 +1123,7 @@ var drawSegmentGrid = function(data) {
 	var canvas = document.getElementById('canvas' + idx);
 	var ctx = canvas.getContext('2d');
 	ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+  ctx.strokeStyle = BG_WHITE ? 'rgba(0, 0, 0, 0.07)':'rgba(255, 255, 255, 0.07)';
   ctx.fillStyle = "none";
 
 	let seq = data.data;
@@ -1214,9 +1216,9 @@ var drawVaryingWidth = function(sheep) {
             lastDistance = d;
 			ctx.moveTo(coords[2] + xOff, coords[3] + yOff);
 			ctx.lineTo(coords[0] + xOff, coords[1] + yOff);
-            ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.003)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.003)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 		}
 	}, 5);
 };
@@ -1297,7 +1299,7 @@ var startPaint = (event) => {
 var paint = (event) => {
   if (!isPainting) return;
   ctx.fillStyle = 'none';
-  ctx.strokeStyle = 'white';
+  ctx.strokeStyle = BG_WHITE ? 'black' : 'white';
   ctx.beginPath();
   ctx.moveTo(mousePos.x, mousePos.y); // old pos
   mousePos = {
