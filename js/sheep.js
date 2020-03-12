@@ -1082,6 +1082,8 @@ var initGrid = function() {
 
 initGrid();
 
+let drawing = true;
+
 var replay = (recordData) => {
   let record = JSON.parse(recordData);
   let progress = {};
@@ -1098,12 +1100,15 @@ var replay = (recordData) => {
       for (let j = 0; j < nCol; j++) {
         let idx = i * nCol + j;
         let prog = progress[idx];
-        drawSegmentGrid({id: idx, data: record[idx].slice(prog, prog + delta)});
-        
-        progress[idx] += delta;
-        if (progress[idx] >= record[idx].length) {
-          clearInterval(replay);
-          beginAnimation();
+        if (drawing) {
+          drawSegmentGrid({id: idx, data: record[idx].slice(prog, prog + delta)});
+          
+          progress[idx] += delta;
+          if (progress[idx] >= record[idx].length) {
+            clearInterval(replay);
+            beginAnimation();
+            drawing = false;
+          }
         }
       }
     }
