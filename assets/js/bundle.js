@@ -692,8 +692,6 @@ const REPLAY = true;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-ctx.lineCap = 'round';
-ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
 
 var FileSaver = require('file-saver');
 
@@ -750,101 +748,7 @@ var initSocket = setInterval(() => {
 		socket.on('endGrid', () => {
       console.log("end drawing");
       
-      for (let i = 0; i < nRow * nCol; i++) {
-        let dummy = document.createElement("canvas");
-        dummy.width = canvas.width;
-        dummy.height = canvas.height;
-        dummy.id = "dummy-canvas"
-        document.body.appendChild(dummy);
-        var ctx = dummy.getContext('2d');
-        ctx.lineWidth = 2;
-        ctx.fillStyle="black";
-        ctx.fillRect(0,0,canvas.width,canvas.height);
-        ctx.strokeStyle="white";
-    
-        // setup rig
-        doodleRig.setup({
-          width:dummy.width,
-          height:dummy.height,
-          fat:FAT,
-          bleed:BLEED,
-          canvasId:"dummy-canvas"
-          });
-    
-        // generate skeleton
-        console.log(grid[i].strokes);
-        var ret = doodleRig.process(grid[i].strokes);
-    
-          let skin = ret.skin;
-          for (let j = 0; j < skin.length; j++) {
-            skin[j].x0 = parseFloat(j) / skin.length * canvas.width;
-            skin[j].y0 = canvas.height * 0.5;
-          }
-    
-          grid[i]['nodes'] = ret.nodes;
-          grid[i]['skin'] = ret.skin;
-    
-          dummy.parentElement.removeChild(dummy);
-
-      }
-
-      setInterval(() => {
-        try {
-          for (let i = 0; i < nRow * nCol; ++i) {
-            var canvas = document.getElementById('canvas' + i);
-            var ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-            let time = (new Date()).getTime();
-            
-            let nodes = grid[i].nodes;
-            let skin = grid[i].skin;
-            for (var j = 0; j < nodes.length; j++){
-              if (nodes[j].parent ){
-                var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
-                nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
-              }
-              else
-              {
-                nodes[j].th = nodes[j].th0;
-              }
-            }
-            doodleMeta.forwardKinematicsNodes(nodes);
-            doodleMeta.calculateSkin(skin);
-              
-            ctx.strokeStyle="black";  
-            ctx.fillStyle = "none";
-            ctx.lineWidth = 1.0 + Math.random()*2;
-            ctx.lineJoin = "round";
-            ctx.lineCap = "round";
-            
-            let t = time * 0.008;
-            for (var j = 0; j < skin.length; j++){
-              // let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
-              // let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
-              // lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
-              // lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
-              // let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
-              // let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
-              let target_x = skin[j].x;
-              let target_y = skin[j].y;
-              if (!skin[j].connect){
-                if (j != 0){
-                ctx.stroke();
-                }
-                ctx.beginPath();
-                ctx.moveTo(target_x, target_y);
-              }else{
-                ctx.lineTo(target_x, target_y);
-              }
-            }
-            ctx.stroke();
-          }
-        }catch(e) {
-          console.log(e);
-        }
-        
-      }, 30);
+      beginAnimation();
 		})
 
 		socket.on('end', () => {
@@ -854,6 +758,109 @@ var initSocket = setInterval(() => {
 		})
 	}
 }, 1000);
+
+var beginAnimation = () => {
+  for (let i = 0; i < nRow * nCol; i++) {
+    let canvas = document.getElementById('canvas' + i);
+    let ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let dummy = document.createElement("canvas");
+    dummy.width = canvas.width;
+    dummy.height = canvas.height;
+    dummy.id = "dummy-canvas"
+    document.body.appendChild(dummy);
+    ctx = dummy.getContext('2d');
+    ctx.lineWidth = 2;
+    ctx.fillStyle="black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle="white";
+
+    // setup rig
+    doodleRig.setup({
+      width:dummy.width,
+      height:dummy.height,
+      fat:FAT,
+      bleed:BLEED,
+      canvasId:"dummy-canvas"
+      });
+
+    // generate skeleton
+    console.log(grid[i].strokes);
+    var ret = doodleRig.process(grid[i].strokes);
+
+      let skin = ret.skin;
+      for (let j = 0; j < skin.length; j++) {
+        skin[j].x0 = parseFloat(j) / skin.length * canvas.width;
+        skin[j].y0 = canvas.height * 0.5;
+      }
+
+      grid[i]['nodes'] = ret.nodes;
+      grid[i]['skin'] = ret.skin;
+
+      dummy.parentElement.removeChild(dummy);
+
+  }
+
+  setInterval(() => {
+    try {
+      for (let i = 0; i < nRow * nCol; ++i) {
+        var canvas = document.getElementById('canvas' + i);
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let time = (new Date()).getTime();
+        
+        let nodes = grid[i].nodes;
+        let skin = grid[i].skin;
+        for (var j = 0; j < nodes.length; j++){
+          if (nodes[j].parent ){
+            var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
+            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
+          }
+          else
+          {
+            nodes[j].th = nodes[j].th0;
+          }
+        }
+        doodleMeta.forwardKinematicsNodes(nodes);
+        doodleMeta.calculateSkin(skin);
+          
+        ctx.strokeStyle="white";  
+        ctx.fillStyle = "none";
+        ctx.lineWidth = 1.0 + Math.random();
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        
+        let t = time * 0.008;
+        for (var j = 0; j < skin.length; j++){
+          // let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
+          // let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
+          // lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
+          // lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
+          // let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
+          // let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
+          let target_x = skin[j].x;
+          let target_y = skin[j].y;
+          if (!skin[j].connect){
+            if (j != 0){
+            ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.moveTo(target_x * SCALE, target_y * SCALE);
+          }else{
+            ctx.lineTo(target_x * SCALE, target_y * SCALE);
+          }
+        }
+        ctx.stroke();
+      }
+    }catch(e) {
+      console.log(e);
+    }
+    
+  }, 30);
+}
 
 
 
@@ -955,9 +962,9 @@ let mousePos = {x: 0, y: 0};
 
 
 let width = 1;
-let minWidth = 0.5;
+let minWidth = 0.8;
 let maxWidth = 1.7;
-let deltaWidth = 0.15;
+let deltaWidth = 0.1;
 let lastDistance = 0.0;
 let firstStroke = true;
 
@@ -1051,278 +1058,25 @@ var saveRig = (strokes) => {
   beginDraw(id);
 }
 
-
-const n = 10;
-
-let lerpMousePos = [];
-
-var testAnimation = (strokes) => {
-  doodleRig.checkOpenCVReady(() => {console.log('cv ready'); })
-  
-  for (let i = 0; i < n; i++) {
-    var canvas = document.getElementById('canvas' + i);
-    var ctx = canvas.getContext('2d');
-    ctx.lineWidth = 1;
-    ctx.fillStyle="white";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle="black";
-    draw_strokes(ctx, strokes);
-
-    // setup rig
-    doodleRig.setup({
-      width:canvas.width,
-      height:canvas.height,
-      fat:FAT,
-      bleed:BLEED,
-      canvasId:'canvas'+i
-      });
-
-    // generate skeleton
-    var ret = doodleRig.process(strokes);
-
-    // make copies
-    //for (let i = 0; i < n; i++) {
-      let skin = ret.skin;
-      for (let j = 0; j < skin.length; j++) {
-        skin[j].x0 = parseFloat(j) / skin.length * canvas.width;
-        skin[j].y0 = canvas.height * 0.5;
-      }
-
-      NODES.push(ret.nodes)
-      SKIN.push(ret.skin);
-
-      lerpMousePos.push({x:0, y:0});
-
-    //}
-
-  }
-  
-
-	setInterval(() => {
-    try {
-
-      for (let i = 0; i < n; ++i) {
-        var canvas = document.getElementById('canvas' + i);
-        var ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // ctx.fillStyle="black";
-        // ctx.fillRect(0,0,canvas.width,canvas.height);
-        // ctx.strokeStyle="white";
-        // ctx.fillStyle="none";
-
-        let time = (new Date()).getTime();
-        
-        let nodes = NODES[i];
-        let skin = SKIN[i];
-        for (var j = 0; j < nodes.length; j++){
-          if (nodes[j].parent ){
-            var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
-            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
-          }
-          else
-          {
-            nodes[j].th = nodes[j].th0;
-          }
-        }
-        doodleMeta.forwardKinematicsNodes(nodes);
-        doodleMeta.calculateSkin(skin);
-          
-        ctx.strokeStyle="black";  
-        ctx.fillStyle = "none";
-        ctx.lineWidth = 1.0 + Math.random()*2;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        
-        let t = time * 0.008;
-        for (var j = 0; j < skin.length; j++){
-          let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
-          let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
-
-          // let target_x = lerp(x0, skin[j].x, Math.abs(mousePos.x - window.innerWidth*0.5) / (window.innerWidth*0.5));
-          // let target_y = lerp(y0, skin[j].y, Math.abs(mousePos.y - window.innerHeight*0.5) / (window.innerHeight*0.5));
-          lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
-          lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
-          let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
-          let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
-          // let target_x = skin[j].x;
-          // let target_y = skin[j].y;
-          if (!skin[j].connect){
-            if (j != 0){
-            ctx.stroke();
-            }
-            ctx.beginPath();
-            ctx.moveTo(target_x, target_y);
-          }else{
-            ctx.lineTo(target_x, target_y);
-          }
-        }
-        ctx.stroke();
-      }
-    }catch(e) {
-      console.log(e);
-    }
-    
-	}, 30);
-}
-
-
-var testAnimationRig = async (strokes) => {
-  let response = await fetch('data/rig/' + id + '_rig.json');
-  let data = await response.text();
-  //console.log(data);
-  let rig = parse(data);
-  //console.log(rig);
-
-  let NODES = [];
-  let SKIN = [];
-
-  NODES.push(rig[1]);
-  SKIN.push(rig[2]);
-  lerpMousePos.push({x:0, y:0});
-
-  for (let i = 1; i < n; i++) {
-    let node = doodleMeta.deepCopyNodes(rig[1]);
-    let skin = doodleMeta.buildSkin(strokes, node);
-    for (j = 0; j < rig[2].length; j++) {
-      skin[j].x0 = rig[2][j].x0;
-      skin[j].y0 = rig[2][j].y0;
-    }
-
-    NODES.push(node);
-    SKIN.push(skin);
-    lerpMousePos.push({x:0, y:0});
-
-  }
-  
-	setInterval(() => {
-    try {
-
-      for (let i = 0; i < n; ++i) {
-        var canvas = document.getElementById('canvas' + i);
-        var ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // ctx.fillStyle="black";
-        // ctx.fillRect(0,0,canvas.width,canvas.height);
-        // ctx.strokeStyle="white";
-        // ctx.fillStyle="none";
-
-        let time = (new Date()).getTime();
-        
-        let nodes = NODES[i];
-        let skin = SKIN[i];
-        for (var j = 0; j < nodes.length; j++){
-          if (nodes[j].parent ){
-            var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
-            nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
-          }
-          else
-          {
-            nodes[j].th = nodes[j].th0;
-          }
-        }
-        doodleMeta.forwardKinematicsNodes(nodes);
-        doodleMeta.calculateSkin(skin);
-          
-        ctx.strokeStyle="black";  
-        ctx.fillStyle = "none";
-        ctx.lineWidth = 1.0 + Math.random()*2;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        
-        let t = time * 0.008;
-        for (var j = 0; j < skin.length; j++){
-          let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
-          let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
-
-          // let target_x = lerp(x0, skin[j].x, Math.abs(mousePos.x - window.innerWidth*0.5) / (window.innerWidth*0.5));
-          // let target_y = lerp(y0, skin[j].y, Math.abs(mousePos.y - window.innerHeight*0.5) / (window.innerHeight*0.5));
-          lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
-          lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
-          let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
-          let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
-          // let target_x = skin[j].x;
-          // let target_y = skin[j].y;
-          if (!skin[j].connect){
-            if (j != 0){
-            ctx.stroke();
-            }
-            ctx.beginPath();
-            ctx.moveTo(target_x, target_y);
-          }else{
-            ctx.lineTo(target_x, target_y);
-          }
-        }
-        ctx.stroke();
-      }
-    }catch(e) {
-      console.log(e);
-    }
-    
-	}, 30);
-}
-
-// draw a sequence sent from server
-var drawSegment = function(data) {
-	if (data.length <= 1) {
-		firstStroke = true;
-		return;
-	}
-
-	if (!lastPos) {
-		lastPos = data[0];
-	}
-
-	//ctx.beginPath();
-	//ctx.moveTo(lastPos[0], lastPos[1]);
-
-	data.forEach((coord, i) => {
-		if (i > 0) {
-			let x = coord[0];
-			let y = coord[1];
-			if (x === 0 && y === 0) {
-				width = minWidth;
-				ctx.lineWidth = width;
-				firstStroke = true;
-			}
-			else {
-				ctx.beginPath()
-				let d = coord[2];
-				if (d > lastDistance) {
-					width = Math.max(minWidth, width - deltaWidth);
-				}
-				else if (d < lastDistance) {
-					width = Math.min(maxWidth, width + deltaWidth);
-				}
-				lastDistance = d;
-				ctx.lineWidth = width;
-				if (firstStroke) {
-					firstStroke = false;
-					ctx.moveTo(x,y);
-				}
-				else if (distance(x, y, lastPos[0], lastPos[1]) < 50) {
-					ctx.moveTo(lastPos[0], lastPos[1]);
-					ctx.lineTo(x, y);
-				}
-				lastPos = [x, y];
-				//ctx.fillStyle = 'rgba(255,255,255,0.003)';
-            	//ctx.fillRect(0, 0, canvas.width, canvas.height);
-				ctx.stroke();
-			}
-		}
-	})
-
-}
-
 var grid = {};
 const nRow = 7;
 const nCol = 7;
 const SCALE = 0.7;
 
 var initGrid = function() {
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
 	for (let i = 0; i < nRow; i++) {
 		for (let j = 0; j < nCol; j++) {
 			let idx = i * nCol + j;
-			grid[idx] = {firstStroke: true, lastPos: {x: 0, y: 0}, width: minWidth, lastDistance: 0, strokes: [], history:[]};
+      grid[idx] = {firstStroke: true, lastPos: {x: 0, y: 0}, width: minWidth, lastDistance: 0, strokes: [], history:[]};
+      var canvas = document.getElementById('canvas' + idx);
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 		}
 	}
 }
@@ -1350,6 +1104,7 @@ var replay = (recordData) => {
         progress[idx] += delta;
         if (progress[idx] >= record[idx].length) {
           clearInterval(replay);
+          beginAnimation();
         }
       }
     }
@@ -1362,7 +1117,7 @@ var drawSegmentGrid = function(data) {
 	var canvas = document.getElementById('canvas' + idx);
 	var ctx = canvas.getContext('2d');
 	ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.07)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
   ctx.fillStyle = "none";
 
 	let seq = data.data;
@@ -1418,39 +1173,6 @@ var drawSegmentGrid = function(data) {
       ctx.stroke();
     }
 
-		// if (i > 0) {
-		// 	let x = coord[0];
-		// 	let y = coord[1];
-		// 	if (x === 0 && y === 0) {
-		// 		grid[idx].width = minWidth;
-		// 		ctx.lineWidth = grid[idx].width;
-		// 		grid[idx].firstStroke = true;
-		// 	}
-		// 	else {
-		// 		ctx.beginPath()
-		// 		let d = coord[2];
-		// 		if (d > grid[idx].lastDistance) {
-		// 			grid[idx].width = Math.max(minWidth, grid[idx].width - deltaWidth);
-		// 		}
-		// 		else if (d < grid[idx].lastDistance) {
-		// 			grid[idx].width = Math.min(maxWidth, grid[idx].width + deltaWidth);
-		// 		}
-		// 		grid[idx].lastDistance = d;
-		// 		ctx.lineWidth = grid[idx].width;
-		// 		if (grid[idx].firstStroke) {
-		// 			grid[idx].firstStroke = false;
-		// 			ctx.moveTo(x,y);
-		// 		}
-		// 		else if (distance(x, y, grid[idx].lastPos[0], grid[idx].lastPos[1]) < 50) {
-		// 			ctx.moveTo(grid[idx].lastPos[0], grid[idx].lastPos[1]);
-		// 			ctx.lineTo(x, y);
-		// 		}
-		// 		grid[idx].lastPos = [x, y];
-		// 		//ctx.fillStyle = 'rgba(255,255,255,0.003)';
-    //         	//ctx.fillRect(0, 0, canvas.width, canvas.height);
-		// 		ctx.stroke();
-		// 	}
-		// }
   });
   
   ctx.stroke();
@@ -1571,7 +1293,7 @@ var startPaint = (event) => {
 var paint = (event) => {
   if (!isPainting) return;
   ctx.fillStyle = 'none';
-  ctx.strokeStyle = 'black';
+  ctx.strokeStyle = 'white';
   ctx.beginPath();
   ctx.moveTo(mousePos.x, mousePos.y); // old pos
   mousePos = {
