@@ -1097,7 +1097,7 @@ var replay = (recordData) => {
 		}
   }
   
-  const delta = 10;
+  const delta = 3;
   setInterval(() => {
     for (let i = 0; i < nRow; i++) {
       for (let j = 0; j < nCol; j++) {
@@ -1118,6 +1118,9 @@ var replay = (recordData) => {
   }, 30);
 }
 
+let svg_grid = 0;
+const SVG_SCALE = 2;
+
 // draw a sequence on a canvas of the grid
 var drawSegmentGrid = function(data) {
 	let idx = data.id;
@@ -1135,6 +1138,8 @@ var drawSegmentGrid = function(data) {
   
   let grid_state = grid[idx];
   //ctx.beginPath();
+
+  if (Math.random() < 0.002) svg_grid = Math.floor(Math.random() * nRow * nCol);
 
 	seq.forEach((cmd) => {
     let x, y;
@@ -1166,6 +1171,17 @@ var drawSegmentGrid = function(data) {
         grid_state.lastDistance = d;
         let k = grid_state.strokes.length - 1;
         grid_state.strokes[k].push([x, y]);
+
+        
+        if (idx == svg_grid || idx == svg_grid * 2 || idx*2 == svg_grid || idx == svg_grid * 3 || idx*3 == svg_grid) {
+          let svg_line = document.createElementNS('http://www.w3.org/2000/svg','line');
+          svg_line.setAttribute('x1', grid_state.lastPos.x * SVG_SCALE);
+          svg_line.setAttribute('y1', grid_state.lastPos.y * SVG_SCALE);
+          svg_line.setAttribute('x2', x * SVG_SCALE);
+          svg_line.setAttribute('y2', y * SVG_SCALE);
+          svg_line.setAttribute('stroke', 'black');
+          document.getElementById('axidraw_svg').append(svg_line);
+        }
       }
       else {
         // unexpected movement
@@ -1175,6 +1191,7 @@ var drawSegmentGrid = function(data) {
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x * SCALE, y * SCALE);
+
       }
       [grid_state.lastPos.x, grid_state.lastPos.y] = [x, y];
       
