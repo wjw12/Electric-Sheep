@@ -617,7 +617,6 @@ var doodleMeta = new function(){
         return [];
       }
 
-      console.log(cv.COLOR_BGR2GRAY)
       cv.cvtColor(src, src, cv.COLOR_RGB2GRAY);
       let ksize = new cv.Size(BLEED*2+1, BLEED*2+1);
       let anchor = new cv.Point(-BLEED, -BLEED);
@@ -732,13 +731,103 @@ var initSocket = setInterval(() => {
 		})
 
 		socket.on('endGrid', () => {
-			console.log("end drawing");
-			// for (let id = 0; id < 25; id++) {
-			// 	let canvas = document.getElementById('canvas'+id);
-			// 	canvas.toBlob(function(blob) {
-			// 			FileSaver.saveAs(blob, 'grid' + id + ".png");
-			// 		});
-			// }
+      console.log("end drawing");
+      
+      for (let i = 0; i < nRow * nCol; i++) {
+        let dummy = document.createElement("canvas");
+        dummy.width = canvas.width;
+        dummy.height = canvas.height;
+        dummy.id = "dummy-canvas"
+        document.body.appendChild(dummy);
+        var ctx = dummy.getContext('2d');
+        ctx.lineWidth = 2;
+        ctx.fillStyle="black";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.strokeStyle="white";
+    
+        // setup rig
+        doodleRig.setup({
+          width:dummy.width,
+          height:dummy.height,
+          fat:FAT,
+          bleed:BLEED,
+          canvasId:"dummy-canvas"
+          });
+    
+        // generate skeleton
+        console.log(grid[i].strokes);
+        var ret = doodleRig.process(grid[i].strokes);
+    
+          let skin = ret.skin;
+          for (let j = 0; j < skin.length; j++) {
+            skin[j].x0 = parseFloat(j) / skin.length * canvas.width;
+            skin[j].y0 = canvas.height * 0.5;
+          }
+    
+          grid[i]['nodes'] = ret.nodes;
+          grid[i]['skin'] = ret.skin;
+    
+          dummy.parentElement.removeChild(dummy);
+
+      }
+
+      setInterval(() => {
+        try {
+          for (let i = 0; i < nRow * nCol; ++i) {
+            var canvas = document.getElementById('canvas' + i);
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+            let time = (new Date()).getTime();
+            
+            let nodes = grid[i].nodes;
+            let skin = grid[i].skin;
+            for (var j = 0; j < nodes.length; j++){
+              if (nodes[j].parent ){
+                var r = Math.min(Math.max(parseFloat(atob(nodes[j].id)),0.3),0.7);
+                nodes[j].th = nodes[j].th0 + Math.sin(time*(i+1)*0.001/r+r*Math.PI*2)*r*0.2*Math.sin(i+1);
+              }
+              else
+              {
+                nodes[j].th = nodes[j].th0;
+              }
+            }
+            doodleMeta.forwardKinematicsNodes(nodes);
+            doodleMeta.calculateSkin(skin);
+              
+            ctx.strokeStyle="black";  
+            ctx.fillStyle = "none";
+            ctx.lineWidth = 1.0 + Math.random()*2;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            
+            let t = time * 0.008;
+            for (var j = 0; j < skin.length; j++){
+              // let x0 = skin[j].x0 * (1 + 0.001 * (Math.sin(t*0.2 + 0.8*j) + 0.76*Math.sin(2.1*t*0.2 + 0.2*j) + 0.43*Math.sin(3.32*t*0.25 + 0.45*j)));
+              // let y0 = skin[j].y0 * (1 + powerLerp(0.4, 0.0002, Math.abs(skin[j].x0 - canvas.width*0.5) / (canvas.width*0.5), 0.2) * (Math.sin(t*0.9 + 0.8*j) + 0.76*Math.sin(2.1*t*0.89 + 0.2*j) + 0.43*Math.sin(3.32*t*0.86 + 0.45*j)));
+              // lerpMousePos[i].x = lerp(lerpMousePos[i].x, mousePos.x, 0.001 * (i+1) / n);
+              // lerpMousePos[i].y = lerp(lerpMousePos[i].y, mousePos.y, 0.001 * (i+1) / n);
+              // let target_x = powerLerp(x0, skin[j].x, Math.abs(lerpMousePos[i].x - window.innerWidth*0.5) / (window.innerWidth*0.5), 1.7 + 1.5 * Math.sin(j  * 50 / skin.length));
+              // let target_y = powerLerp(y0, skin[j].y, Math.abs(lerpMousePos[i].y - window.innerHeight*0.5) / (window.innerHeight*0.5), 1.6 + 1.3 * Math.sin(j  * 40 / skin.length));
+              let target_x = skin[j].x;
+              let target_y = skin[j].y;
+              if (!skin[j].connect){
+                if (j != 0){
+                ctx.stroke();
+                }
+                ctx.beginPath();
+                ctx.moveTo(target_x, target_y);
+              }else{
+                ctx.lineTo(target_x, target_y);
+              }
+            }
+            ctx.stroke();
+          }
+        }catch(e) {
+          console.log(e);
+        }
+        
+      }, 30);
 		})
 
 		socket.on('end', () => {
@@ -818,6 +907,26 @@ var drawSheep = function(sheep) {
 	}, 0.1);
 };
 
+var parseJsonSheep = (data) => {
+  console.log(data);
+  data = JSON.parse(data);
+  console.log(data);
+  ctx.beginPath();
+  return eachWithTimeout(data, function(cmd) {
+    if (cmd.type == "line_to") {
+      ctx.lineTo(cmd.x, cmd.y);
+    }
+    else if (cmd.type == "move_to") {
+      ctx.moveTo(cmd.x, cmd.y);
+    }
+    else if (cmd.type == "close_path") {
+      ctx.stroke();
+      ctx.beginPath();
+    }
+		
+	}, 50);
+}
+
 let mousePos = {x: 0, y: 0};
 
 function getMousePos(e) {
@@ -829,9 +938,9 @@ document.onmousemove=function(e) {
 
 
 let width = 1;
-let minWidth = 0.2;
-let maxWidth = 2;
-let deltaWidth = 0.05;
+let minWidth = 0.5;
+let maxWidth = 2.5;
+let deltaWidth = 0.15;
 let lastDistance = 0.0;
 let firstStroke = true;
 
@@ -839,8 +948,8 @@ let drawSequence = [];
 
 var FAT = 15;
 var BLEED = 5;
-//let NODES = [];
-//let SKIN = []
+let NODES = [];
+let SKIN = []
 
 let lastPos = null;
 
@@ -856,9 +965,12 @@ var powerLerp = (x0, x1, t, k) => {
   return x0 + (x1 - x0) * Math.pow(t, k);
 }
 
+// TODO change data format to JSON
 var parseSheep = (sheep) => {
 	var xOff = parseFloat(sheep.xOff, 10);
-	var yOff = parseFloat(sheep.yOff, 10);
+  var yOff = parseFloat(sheep.yOff, 10);
+  
+  let drawSequence = []
 	
 	let commands = sheep.drawing.split('_');
 	let seq = [];
@@ -877,9 +989,7 @@ var parseSheep = (sheep) => {
 	})
 
 	socket.emit('draw', drawSequence);
-	let testDrawSequence = drawSequence.slice();
-	drawSequence = [];
-	return testDrawSequence;
+	return drawSequence;
 	
 }
 
@@ -932,7 +1042,6 @@ let lerpMousePos = [];
 var testAnimation = (strokes) => {
   doodleRig.checkOpenCVReady(() => {console.log('cv ready'); })
   
-
   for (let i = 0; i < n; i++) {
     var canvas = document.getElementById('canvas' + i);
     var ctx = canvas.getContext('2d');
@@ -1195,7 +1304,7 @@ var initGrid = function() {
 	for (let i = 0; i < nRow; i++) {
 		for (let j = 0; j < nCol; j++) {
 			let idx = i * nCol + j;
-			grid[idx] = {firstStroke: true, lastPos: [0, 0], width: minWidth, lastDistance: 0};
+			grid[idx] = {firstStroke: true, lastPos: {x: 0, y: 0}, width: minWidth, lastDistance: 0, strokes: []};
 		}
 	}
 }
@@ -1210,52 +1319,83 @@ var drawSegmentGrid = function(data) {
 	ctx.lineCap = 'round';
 	ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
 
-	let seq = data.seq;
+	let seq = data.data;
 
 	if (grid === {}) { initGrid();}
 
-	//console.log("receive segment", data);
-	if (seq.length <= 1) {
-		grid[idx].firstStroke = true;
-		return;
-	}
+  console.log("receive segment", data);
+  
+  let grid_state = grid[idx];
+  ctx.beginPath();
+  ctx.moveTo(grid_state.lastPos.x, grid_state.lastPos.y);
 
-	seq.forEach((coord, i) => {
-		if (i > 0) {
-			let x = coord[0];
-			let y = coord[1];
-			if (x === 0 && y === 0) {
-				grid[idx].width = minWidth;
-				ctx.lineWidth = grid[idx].width;
-				grid[idx].firstStroke = true;
-			}
-			else {
-				ctx.beginPath()
-				let d = coord[2];
-				if (d > grid[idx].lastDistance) {
-					grid[idx].width = Math.max(minWidth, grid[idx].width - deltaWidth);
-				}
-				else if (d < grid[idx].lastDistance) {
-					grid[idx].width = Math.min(maxWidth, grid[idx].width + deltaWidth);
-				}
-				grid[idx].lastDistance = d;
-				ctx.lineWidth = grid[idx].width;
-				if (grid[idx].firstStroke) {
-					grid[idx].firstStroke = false;
-					ctx.moveTo(x,y);
-				}
-				else if (distance(x, y, grid[idx].lastPos[0], grid[idx].lastPos[1]) < 50) {
-					ctx.moveTo(grid[idx].lastPos[0], grid[idx].lastPos[1]);
-					ctx.lineTo(x, y);
-				}
-				grid[idx].lastPos = [x, y];
-				//ctx.fillStyle = 'rgba(255,255,255,0.003)';
-            	//ctx.fillRect(0, 0, canvas.width, canvas.height);
-				ctx.stroke();
-			}
-		}
-	});
+	seq.forEach((cmd) => {
+    let x, y;
 
+    if (cmd.type == 'begin_path') {
+      ctx.beginPath();
+      grid_state.strokes.push([])
+    }
+    else if (cmd.type == 'move_to') {
+      [x, y] = [cmd.x, cmd.y];
+      ctx.moveTo(x, y);
+      grid_state.lastDistance = distance(x, y, grid_state.lastPos.x, grid_state.lastPos.y);
+      [grid_state.lastPos.x, grid_state.lastPos.y] = [x, y];
+      let k = grid_state.strokes.length - 1;
+      grid_state.strokes[k].push([x, y]);
+    }
+    else if (cmd.type == "line_to") {
+      [x, y] = [cmd.x, cmd.y];
+      ctx.lineTo(x, y);
+      let d = distance(x, y, grid_state.lastPos.x, grid_state.lastPos.y);
+      if (d > grid_state.lastDistance) grid_state.width = Math.max(minWidth, grid_state.width - deltaWidth);
+      else grid_state.width = Math.min(maxWidth, grid_state.width + deltaWidth);
+      ctx.lineWidth = grid_state.width;
+      grid_state.lastDistance = d;
+      [grid_state.lastPos.x, grid_state.lastPos.y] = [x, y];
+      let k = grid_state.strokes.length - 1;
+      grid_state.strokes[k].push([x, y]);
+    }
+    else if (cmd.type == 'close_path') {
+      ctx.stroke();
+    }
+
+		// if (i > 0) {
+		// 	let x = coord[0];
+		// 	let y = coord[1];
+		// 	if (x === 0 && y === 0) {
+		// 		grid[idx].width = minWidth;
+		// 		ctx.lineWidth = grid[idx].width;
+		// 		grid[idx].firstStroke = true;
+		// 	}
+		// 	else {
+		// 		ctx.beginPath()
+		// 		let d = coord[2];
+		// 		if (d > grid[idx].lastDistance) {
+		// 			grid[idx].width = Math.max(minWidth, grid[idx].width - deltaWidth);
+		// 		}
+		// 		else if (d < grid[idx].lastDistance) {
+		// 			grid[idx].width = Math.min(maxWidth, grid[idx].width + deltaWidth);
+		// 		}
+		// 		grid[idx].lastDistance = d;
+		// 		ctx.lineWidth = grid[idx].width;
+		// 		if (grid[idx].firstStroke) {
+		// 			grid[idx].firstStroke = false;
+		// 			ctx.moveTo(x,y);
+		// 		}
+		// 		else if (distance(x, y, grid[idx].lastPos[0], grid[idx].lastPos[1]) < 50) {
+		// 			ctx.moveTo(grid[idx].lastPos[0], grid[idx].lastPos[1]);
+		// 			ctx.lineTo(x, y);
+		// 		}
+		// 		grid[idx].lastPos = [x, y];
+		// 		//ctx.fillStyle = 'rgba(255,255,255,0.003)';
+    //         	//ctx.fillRect(0, 0, canvas.width, canvas.height);
+		// 		ctx.stroke();
+		// 	}
+		// }
+  });
+  
+  ctx.stroke();
 
 }
 
@@ -1303,7 +1443,14 @@ var id = parseInt(q.sheep, 10);
 const beginDraw = (id) => {
 	if (id) {
 		const sheepId = document.getElementById('current_sheep_id');
-		sheepId.innerHTML = id;
+    sheepId.innerHTML = id;
+    
+    // fetch('data/cleaned_sheep.json')
+    //   .then(r => r.text())
+    //   .then(parseJsonSheep);
+
+    // return;
+
 		fetch('data/' + id + '.txt')
 			.then(r => r.text())
 			.then(parseQuery)
@@ -1312,7 +1459,7 @@ const beginDraw = (id) => {
 			.then(parseSheep)
       //.then(testAnimation);
       //.then(saveRig);
-      .then(testAnimationRig);
+      //.then(testAnimationRig);
 	}
 }
 

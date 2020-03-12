@@ -10,7 +10,8 @@ function isWindows() {
     return navigator.platform.indexOf('Win') > -1
   }
   
-  var SKELETONIZATION_USE_GPU = !isWindows();
+  //var SKELETONIZATION_USE_GPU = !isWindows();
+  var SKELETONIZATION_USE_GPU = true;
   if (!SKELETONIZATION_USE_GPU){
     //alert("Some GPU features not supported for your platform, certain actions might be slow... (But we're working on it!)")
   }
