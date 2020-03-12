@@ -688,6 +688,11 @@ function draw_strokes(ctx, strokes){
 
 const REPLAY = true;
 const BG_WHITE = true;
+const SCALE = 0.75;
+
+var grid = {};
+const nRow = 7;
+const nCol = 7;
 
 document.body.style.background = BG_WHITE ? "#FFFFFF" : "#000000";
 
@@ -1059,11 +1064,6 @@ var saveRig = (strokes) => {
   beginDraw(id);
 }
 
-var grid = {};
-const nRow = 7;
-const nCol = 7;
-const SCALE = 0.7;
-
 var initGrid = function() {
   canvas = document.getElementById('canvas');
   ctx = canvas.getContext('2d');
@@ -1135,18 +1135,17 @@ var drawSegmentGrid = function(data) {
   let grid_state = grid[idx];
   //ctx.beginPath();
 
-  grid_state.history = grid_state.history.concat(seq.slice());
-  
-
 	seq.forEach((cmd) => {
     let x, y;
 
     if (cmd.type == 'begin_path') {
+      grid_state.history.push(cmd);
       ctx.beginPath();
       //ctx.moveTo(grid_state.lastPos.x * SCALE, grid_state.lastPos.y * SCALE);
       grid_state.strokes.push([])
     }
     else if (cmd.type == 'move_to') {
+      grid_state.history.push(cmd);
       [x, y] = [cmd.x, cmd.y];
       ctx.moveTo(x * SCALE, y * SCALE);
       grid_state.lastDistance = distance(x, y, grid_state.lastPos.x, grid_state.lastPos.y);
@@ -1158,6 +1157,7 @@ var drawSegmentGrid = function(data) {
       [x, y] = [cmd.x, cmd.y];
       let d = distance(x, y, grid_state.lastPos.x, grid_state.lastPos.y);
       if (d < 50) {
+        grid_state.history.push(cmd);
         ctx.lineTo(x * SCALE, y * SCALE);
         if (d > grid_state.lastDistance) grid_state.width = Math.max(minWidth, grid_state.width - deltaWidth);
         else grid_state.width = Math.min(maxWidth, grid_state.width + deltaWidth);
@@ -1168,6 +1168,9 @@ var drawSegmentGrid = function(data) {
       }
       else {
         // unexpected movement
+        grid_state.history.push({type: 'close_path'});
+        grid_state.history.push({type: 'begin_path'});
+        grid_state.history.push({type: 'move_to', x: x*SCALE, y: y*SCALE});
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x * SCALE, y * SCALE);
@@ -1176,11 +1179,13 @@ var drawSegmentGrid = function(data) {
       
     }
     else if (cmd.type == 'close_path') {
+      grid_state.history.push({type: 'close_path'});
       ctx.stroke();
     }
 
   });
   
+  grid_state.history.push({type: 'close_path'});
   ctx.stroke();
 
 }
